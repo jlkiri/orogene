@@ -10,6 +10,7 @@ use nom::combinator::{all_consuming, map, map_res, opt, recognize};
 use nom::error::{context, convert_error, ParseError, VerboseError};
 use nom::multi::separated_list;
 use nom::sequence::{preceded, tuple};
+use nom::Err::Error;
 use nom::{Err, IResult};
 use oro_diagnostics::{Diagnostic, DiagnosticCode};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
