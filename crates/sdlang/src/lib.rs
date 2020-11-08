@@ -1,18 +1,28 @@
 use oro_diagnostics::{Diagnostic, DiagnosticCode};
 
+use nom::error::convert_error;
+use nom::error::VerboseError;
+use nom::error::VerboseErrorKind;
+use nom::Offset;
+
 use nom::branch::alt;
 use nom::bytes::complete::tag;
+use nom::bytes::complete::take;
+use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
 use nom::character::complete::alpha1;
 use nom::character::complete::alphanumeric0;
 use nom::character::complete::digit1;
 use nom::character::complete::multispace0;
+use nom::combinator::all_consuming;
 use nom::combinator::cut;
 use nom::combinator::opt;
 use nom::combinator::recognize;
 use nom::combinator::value;
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::many0;
+use nom::multi::many1;
+use nom::multi::many_till;
 use nom::sequence::pair;
 use nom::sequence::preceded;
 use nom::sequence::terminated;
@@ -32,7 +42,58 @@ enum Value {
     Null,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, PartialEq)]
+pub struct SDLangParseError<'a> {
+    pub nom_error: VerboseError<&'a str>,
+}
+
+impl<'a> SDLangParseError<'a> {
+    /// Construct with a custom error message
+    pub fn new(input: &'a str) -> Self {
+        Self {
+            nom_error: VerboseError::from_error_kind(input, ErrorKind::Verify),
+        }
+    }
+
+    /// Add a message (useful when created from other error)
+    pub fn with_message(mut self) -> Self {
+        self
+    }
+}
+
+// for ?, maybe
+impl<'a> Into<VerboseError<&'a str>> for SDLangParseError<'a> {
+    fn into(self) -> VerboseError<&'a str> {
+        self.nom_error
+    }
+}
+
+// Make nom accept the custom struct
+impl<'a> ParseError<&'a str> for SDLangParseError<'a> {
+    fn from_error_kind(input: &'a str, kind: ErrorKind) -> Self {
+        Self {
+            nom_error: VerboseError::from_error_kind(input, kind),
+        }
+    }
+
+    fn append(input: &'a str, kind: ErrorKind, mut other: Self) -> Self {
+        println!("INPUT: {}", input);
+        println!("ERRORS: {:#?}", other.nom_error);
+        other
+            .nom_error
+            .errors
+            .push((input, VerboseErrorKind::Nom(kind)));
+        other
+    }
+
+    fn from_char(input: &'a str, c: char) -> Self {
+        Self {
+            nom_error: VerboseError::from_char(input, c),
+        }
+    }
+}
+
+/* #[derive(Debug, thiserror::Error)]
 pub enum SDLangParseError<I: Debug> {
     #[error("{0:#?}: Nom internal error: {2:?}.")]
     Nom(DiagnosticCode, I, ErrorKind),
@@ -44,7 +105,7 @@ pub enum SDLangParseError<I: Debug> {
     IllegalIdentifier(DiagnosticCode, I),
 }
 
-type ParseResult<I, T> = IResult<I, T, SDLangParseError<I>>;
+
 
 impl<'a> From<(&'a str, ErrorKind)> for SDLangParseError<&'a str> {
     fn from((i, ek): (&'a str, ErrorKind)) -> Self {
@@ -71,7 +132,7 @@ impl<I: Sync + Send + Debug> Diagnostic for SDLangParseError<I> {
             _ => DiagnosticCode::OR1000,
         }
     }
-}
+} */
 
 fn skip_any_space<'a, F: 'a, O, E: ParseError<&'a str>>(
     f: F,
@@ -82,28 +143,28 @@ where
     preceded(multispace0, f)
 }
 
-fn space<'a>(source: &'a str) -> IResult<&'a str, &'a str, SDLangParseError<&'a str>> {
+fn space<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, &'a str, E> {
     take_while1(|c: char| c == ' ')(source)
 }
 
-fn skip_space<'a, F: 'a, O>(
+fn skip_space<'a, F: 'a, O, E: ParseError<&'a str>>(
     f: F,
-) -> impl FnMut(&'a str) -> IResult<&'a str, O, SDLangParseError<&'a str>>
+) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: Fn(&'a str) -> IResult<&'a str, O, SDLangParseError<&'a str>>,
+    F: Fn(&'a str) -> IResult<&'a str, O, E>,
 {
-    terminated(f, space)
+    preceded(space, f)
 }
 
-fn integers(source: &str) -> ParseResult<&str, Vec<Value>> {
+/* fn integers<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Vec<Value>, E> {
     many0(skip_space(integer))(source)
 }
 
-fn floats(source: &str) -> ParseResult<&str, Vec<Value>> {
+fn floats<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Vec<Value>, E> {
     many0(skip_space(float))(source)
 }
 
-fn integer(source: &str) -> ParseResult<&str, Value> {
+fn integer<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Value, E> {
     let (input, raw) = recognize(pair(opt(tag("-")), digit1))(source).map_err(|e| e)?;
     match str::parse::<i32>(raw) {
         Err(_) => Err(Error(SDLangParseError::RustRuntimeError(
@@ -114,7 +175,7 @@ fn integer(source: &str) -> ParseResult<&str, Value> {
     }
 }
 
-fn float(source: &str) -> ParseResult<&str, Value> {
+fn float<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Value, E> {
     let (input, raw) =
         recognize(tuple((opt(tag("-")), digit1, tag("."), digit1)))(source).map_err(|e| e)?;
 
@@ -127,27 +188,40 @@ fn float(source: &str) -> ParseResult<&str, Value> {
     }
 }
 
-fn identifier_rest(source: &str) -> ParseResult<&str, &str> {
-    recognize(many0(alt((alpha1, tag("_"), tag("$"), tag("-")))))(source)
+fn identifier_rest<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, &str, E> {
+    let r =
+        take_while(|c: char| c.is_ascii_alphanumeric() || c == '$' || c == '-' || c == '_')(source)
+            .map_err(|e| {
+                println!("AAAAAAAAAAAAAA");
+                println!("Error: {:?}", e);
+                e
+                /* if !input.starts_with(" ") && !input.is_empty() {
+                } */
+            });
+
+    r
 }
 
 fn identifier(source: &str) -> ParseResult<&str, Value> {
-    let (input, id) =
-        recognize(pair(opt(tag("_")), identifier_rest))(source).map_err(Err::convert)?;
-
-    if id.is_empty() {
-        return Err(Error(SDLangParseError::AbsentIdentifier(
+    let (input, res) = take::<_, _, SDLangParseError<&str>>(1usize)(source).map_err(|_| {
+        println!("ABSENT");
+        Error(SDLangParseError::AbsentIdentifier(
             DiagnosticCode::OR1000,
-            input,
-        )));
-    }
+            "",
+        ))
+    })?;
 
-    if !input.is_empty() {
+    let first_char = res.chars().nth(0).unwrap();
+
+    if !first_char.is_ascii_alphabetic() {
+        println!("{}, WRONG", first_char);
         return Err(Error(SDLangParseError::IllegalIdentifier(
             DiagnosticCode::OR1000,
             input,
         )));
     }
+
+    let (input, id) = identifier_rest(source).map_err(|e| e)?;
 
     Ok((input, Value::String(String::from(id))))
 }
@@ -161,24 +235,66 @@ fn string(source: &str) -> ParseResult<&str, Value> {
         .map_err(Err::convert)?;
 
     Ok((input, Value::String(String::from(id))))
-}
+} */
 
-fn boolean(source: &str) -> ParseResult<&str, Value> {
+fn boolean<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Value, E> {
     alt((
         value(Value::Boolean(true), tag("true")),
         value(Value::Boolean(false), tag("false")),
     ))(source)
 }
 
-fn null(source: &str) -> ParseResult<&str, Value> {
+fn many_booleans<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Vec<Value>, E> {
+    many1(terminated(
+        alt((
+            value(Value::Boolean(true), tag("true")),
+            value(Value::Boolean(false), tag("false")),
+        )),
+        space,
+    ))(source)
+}
+
+fn null<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, Value, E> {
     value(Value::Null, tag("null"))(source)
+}
+
+fn semicolon<'a, E: ParseError<&'a str>>(source: &'a str) -> IResult<&'a str, &str, E> {
+    tag(";")(source)
+}
+
+fn consume_semicolon<'a, F: 'a, E: ParseError<&'a str>>(
+    f: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, &str, E>
+where
+    F: FnMut(&'a str) -> IResult<&'a str, &str, E>,
+{
+    terminated(f, semicolon)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn experiment() {
+        let input = "false atrue falsed ";
+        match many_booleans::<SDLangParseError>(input) {
+            Ok((_, v)) => {
+                let a = "b";
+                println!("AAAAAAAAAAAA");
+                println!("offset: {}", a.offset("g"));
+                println!("{:#?}", v);
+            }
+            Err(e) => {
+                if let Error(er) = e {
+                    println!("{:#?}", er.nom_error);
+                    let er_str = convert_error(input, er.nom_error);
+                    println!("{}", er_str);
+                }
+            }
+        }
+    }
 
-    fn assert_ok(r: ParseResult<&'static str, Value>) -> Value {
+    /* fn assert_ok(r: ParseResult<&'static str, Value>) -> Value {
         match r {
             Ok((_, v)) => v,
             Err(e) => panic!(e),
@@ -244,10 +360,18 @@ mod tests {
     }
 
     #[test]
-    fn skip_space_after() {
-        let (input, value) = assert_ok_with_input(skip_space(string)("\"svelte\"    "));
+    fn skip_space_before() {
+        let (input, value) = assert_ok_with_input(skip_space(string)("   \"svelte\""));
 
         assert!(input.is_empty());
         assert_eq!(value, Value::String(String::from("svelte")));
     }
+
+    #[test]
+    fn t() {
+        println!(
+            "{:?}",
+            tuple((identifier, many1(skip_space(identifier)), semicolon))("ab bc 1cd")
+        );
+    } */
 }
