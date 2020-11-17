@@ -2250,6 +2250,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "oro-diagnostics-derive"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "oro-gui-handler"
 version = "0.1.0"
 dependencies = [
