@@ -2245,6 +2245,7 @@ name = "oro-diagnostics"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "oro-diagnostics-derive",
  "thiserror",
  "url",
 ]
