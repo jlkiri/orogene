@@ -19,6 +19,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
     match ast.data {
         Data::Enum(enm) => {
             let mut advices: HashMap<syn::Ident, String> = HashMap::new();
+            let mut labels: HashMap<syn::Ident, String> = HashMap::new();
 
             let variants = enm.variants;
 
@@ -28,13 +29,21 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         let string: syn::LitStr = attr.parse_args().unwrap();
                         advices.insert(variant.ident.clone(), string.value());
                     }
+
+                    if attr.path.is_ident("label") {
+                        let string: syn::LitStr = attr.parse_args().unwrap();
+                        labels.insert(variant.ident.clone(), string.value());
+                    }
                 }
             }
 
             dbg!(&advices);
 
-            let keys = advices.keys();
-            let values = advices.values();
+            let advice_keys = advices.keys();
+            let advice_values = advices.values();
+
+            let label_keys = labels.keys();
+            let label_values = labels.values();
 
             let gen = quote! {
                 impl Diagnostic for #name {
@@ -43,13 +52,17 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     }
 
                     fn label(&self) -> String {
-                        "crate::label".into()
+                        use #name::*;
+                        match self {
+                            #( #label_keys => #label_values.into(),)*
+                            _ => "crate::label".into()
+                        }
                     }
 
                     fn advice(&self) -> Option<String> {
                         use #name::*;
                         match self {
-                            #( #keys => Some(#values.into()),)*
+                            #( #advice_keys => Some(#advice_values.into()),)*
                             _ => None
                         }
                     }
