@@ -1,9 +1,6 @@
-use proc_macro;
-
 use proc_macro::TokenStream;
 use quote::quote;
 use std::collections::HashMap;
-use syn;
 use syn::Data;
 
 #[proc_macro_derive(Diagnostic, attributes(advice, category, label, ask))]
