@@ -68,7 +68,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     syn::Fields::Unit => {
                         let cat_arms = cat.map(|c| {
                             quote! {
-                                #id => DiagnosticCategory::#c
+                                #id => DiagnosticCategory::#c,
                             }
                         });
 
@@ -77,7 +77,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     syn::Fields::Named(_) => {
                         let cat_arms = cat.map(|c| {
                             quote! {
-                                #id {..} => DiagnosticCategory::#c
+                                #id {..} => DiagnosticCategory::#c,
                             }
                         });
 
@@ -87,11 +87,11 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         let cat_arms = cat.map(|c| {
                             if should_ask {
                                 return quote! {
-                                    #id(err) => err.category()
+                                    #id(err) => err.category(),
                                 };
                             }
                             quote! {
-                                #id(..) => DiagnosticCategory::#c
+                                #id(..) => DiagnosticCategory::#c,
                             }
                         });
 
@@ -123,7 +123,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     syn::Fields::Unit => {
                         let label_arms = labels.map(|l| {
                             quote! {
-                                #id => #l.into()
+                                #id => #l.into(),
                             }
                         });
 
@@ -132,7 +132,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     syn::Fields::Named(_) => {
                         let label_arms = labels.map(|l| {
                             quote! {
-                                #id {..} => #l.into()
+                                #id {..} => #l.into(),
                             }
                         });
 
@@ -142,11 +142,11 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         let label_arms = labels.map(|l| {
                             if should_ask {
                                 return quote! {
-                                    #id(err) => err.label()
+                                    #id(err) => err.label(),
                                 };
                             }
                             quote! {
-                                #id(..) => #l.into()
+                                #id(..) => #l.into(),
                             }
                         });
 
@@ -178,7 +178,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     syn::Fields::Unit => {
                         let advices = advices.map(|a| {
                             quote! {
-                                #id => Some(#a.into())
+                                #id => Some(#a.into()),
                             }
                         });
 
@@ -187,7 +187,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     syn::Fields::Named(_) => {
                         let advices = advices.map(|a| {
                             quote! {
-                                #id {..} => Some(#a.into())
+                                #id {..} => Some(#a.into()),
                             }
                         });
 
@@ -197,11 +197,11 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         let advices = advices.map(|a| {
                             if should_ask {
                                 return quote! {
-                                    #id(err) => err.advice()
+                                    #id(err) => err.advice(),
                                 };
                             }
                             quote! {
-                                #id(..) => Some(#a.into())
+                                #id(..) => Some(#a.into()),
                             }
                         });
 
@@ -222,16 +222,12 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
             let cat_keys = categories.keys();
             let cat_values = categories.values(); */
 
-            let ts = Some(quote! {
-                _ => 1
-            });
-
             let gen = quote! {
                 impl Diagnostic for #name {
                     fn category(&self) -> DiagnosticCategory {
                         use #name::*;
                         match self {
-                             #(#cat_arms,)*
+                             #(#cat_arms)*
                             _ => DiagnosticCategory::Misc
                         }
                     }
@@ -239,7 +235,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     fn label(&self) -> String {
                         use #name::*;
                         match self {
-                            #(#label_arms,)*
+                            #(#label_arms)*
                             _ => "crate::label".into()
                         }
                     }
@@ -247,7 +243,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     fn advice(&self) -> Option<String> {
                         use #name::*;
                         match self {
-                            #(#advice_arms,)*
+                            #(#advice_arms)*
                             _ => None
                         }
                     }
