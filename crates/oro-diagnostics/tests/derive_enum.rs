@@ -16,14 +16,14 @@ pub enum Critical {
     #[category(Misc)]
     #[label("critical::blue")]
     #[advice("Blue.")]
-    Blue,
+    Blue(i32),
     #[label("critical::red")]
     #[advice("Red.")]
     #[category(Misc)]
-    Red,
+    Red(i32),
     #[label("critical::orange")]
     #[advice("Orange.")]
-    Orange,
+    Orange(i32),
     Transparent(#[ask] Rainbow),
 }
 

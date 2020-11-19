@@ -10,86 +10,228 @@ pub fn diagnostics_macro_derive(input: TokenStream) -> TokenStream {
     impl_diagnostics_macro(ast)
 }
 
+/* match attr.parse_meta() {
+    Ok(meta) => match meta {
+        syn::Meta::NameValue(nv) => {
+            if nv.path.is_ident("path") {
+                paths.insert(variant.ident.clone(), nv.lit.clone());
+            }
+
+            if nv.path.is_ident("host") {
+                hosts.insert(variant.ident.clone(), nv.lit.clone());
+            }
+
+            if nv.path.is_ident("url") {
+                urls.insert(variant.ident.clone(), nv.lit.clone());
+            }
+        }
+        _ => (),
+    },
+    Err(_) => {
+
+    }
+} */
+
 fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
     let name = ast.ident;
 
     match ast.data {
         Data::Enum(enm) => {
-            let mut advices: HashMap<syn::Ident, String> = HashMap::new();
+            /* let mut advices: HashMap<syn::Ident, String> = HashMap::new();
             let mut labels: HashMap<syn::Ident, String> = HashMap::new();
             let mut categories: HashMap<syn::Ident, syn::Ident> = HashMap::new();
 
-            let mut externals: Vec<syn::Ident> = Vec::new();
+            let mut externals: Vec<syn::Ident> = Vec::new(); */
 
             let variants = enm.variants;
 
-            for variant in variants {
-                /*  */
+            let cat_arms = variants.iter().map(|variant| {
+                let id = &variant.ident;
 
-                for attr in variant.attrs {
-                    /* match attr.parse_meta() {
-                        Ok(meta) => match meta {
-                            syn::Meta::NameValue(nv) => {
-                                if nv.path.is_ident("path") {
-                                    paths.insert(variant.ident.clone(), nv.lit.clone());
-                                }
+                let cat = variant.attrs.iter().find_map(|a| {
+                    if a.path.is_ident("category") {
+                        let id: syn::Ident = a.parse_args().unwrap();
+                        Some(id)
+                    } else {
+                        None
+                    }
+                });
 
-                                if nv.path.is_ident("host") {
-                                    hosts.insert(variant.ident.clone(), nv.lit.clone());
-                                }
+                let has_use_attr: Vec<bool> = variant
+                    .fields
+                    .iter()
+                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("use")))
+                    .collect();
+                let should_ask = has_use_attr.contains(&true);
 
-                                if nv.path.is_ident("url") {
-                                    urls.insert(variant.ident.clone(), nv.lit.clone());
-                                }
+                match variant.fields {
+                    syn::Fields::Unit => {
+                        let cat_arms = cat.map(|c| {
+                            quote! {
+                                #id => DiagnosticCategory::#c
                             }
-                            _ => (),
-                        },
-                        Err(_) => {
+                        });
 
-                        }
-                    } */
-
-                    if attr.path.is_ident("category") {
-                        let id: syn::Ident = attr.parse_args().unwrap();
-                        categories.insert(variant.ident.clone(), id);
+                        cat_arms
                     }
+                    syn::Fields::Named(_) => {
+                        let cat_arms = cat.map(|c| {
+                            quote! {
+                                #id {..} => DiagnosticCategory::#c
+                            }
+                        });
 
-                    if attr.path.is_ident("advice") {
-                        let string: syn::LitStr = attr.parse_args().unwrap();
-                        advices.insert(variant.ident.clone(), string.value());
+                        cat_arms
                     }
+                    syn::Fields::Unnamed(_) => {
+                        let cat_arms = cat.map(|c| {
+                            if should_ask {
+                                return quote! {
+                                    #id(err) => err.category()
+                                };
+                            }
+                            quote! {
+                                #id(..) => DiagnosticCategory::#c
+                            }
+                        });
 
-                    if attr.path.is_ident("label") {
-                        let string: syn::LitStr = attr.parse_args().unwrap();
-                        labels.insert(variant.ident.clone(), string.value());
-                    }
-                }
-
-                for field in variant.fields {
-                    for attr in field.attrs {
-                        if attr.path.is_ident("use") {
-                            externals.push(variant.ident.clone());
-                        }
+                        cat_arms
                     }
                 }
-            }
+            });
 
-            let advice_keys = advices.keys();
+            let label_arms = variants.iter().map(|variant| {
+                let id = &variant.ident;
+
+                let labels = variant.attrs.iter().find_map(|a| {
+                    if a.path.is_ident("labels") {
+                        let string: syn::LitStr = a.parse_args().unwrap();
+                        Some(string.value())
+                    } else {
+                        None
+                    }
+                });
+
+                let has_use_attr: Vec<bool> = variant
+                    .fields
+                    .iter()
+                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("use")))
+                    .collect();
+                let should_ask = has_use_attr.contains(&true);
+
+                match variant.fields {
+                    syn::Fields::Unit => {
+                        let label_arms = labels.map(|l| {
+                            quote! {
+                                #id => #l.into()
+                            }
+                        });
+
+                        label_arms
+                    }
+                    syn::Fields::Named(_) => {
+                        let label_arms = labels.map(|l| {
+                            quote! {
+                                #id {..} => #l.into()
+                            }
+                        });
+
+                        label_arms
+                    }
+                    syn::Fields::Unnamed(_) => {
+                        let label_arms = labels.map(|l| {
+                            if should_ask {
+                                return quote! {
+                                    #id(err) => err.label()
+                                };
+                            }
+                            quote! {
+                                #id(..) => #l.into()
+                            }
+                        });
+
+                        label_arms
+                    }
+                }
+            });
+
+            let advice_arms = variants.iter().map(|variant| {
+                let id = &variant.ident;
+
+                let advices = variant.attrs.iter().find_map(|a| {
+                    if a.path.is_ident("advice") {
+                        let string: syn::LitStr = a.parse_args().unwrap();
+                        Some(string.value())
+                    } else {
+                        None
+                    }
+                });
+
+                let has_use_attr: Vec<bool> = variant
+                    .fields
+                    .iter()
+                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("use")))
+                    .collect();
+                let should_ask = has_use_attr.contains(&true);
+
+                match variant.fields {
+                    syn::Fields::Unit => {
+                        let advices = advices.map(|a| {
+                            quote! {
+                                #id => Some(#a.into())
+                            }
+                        });
+
+                        advices
+                    }
+                    syn::Fields::Named(_) => {
+                        let advices = advices.map(|a| {
+                            quote! {
+                                #id {..} => Some(#a.into())
+                            }
+                        });
+
+                        advices
+                    }
+                    syn::Fields::Unnamed(_) => {
+                        let advices = advices.map(|a| {
+                            if should_ask {
+                                return quote! {
+                                    #id(err) => err.advice()
+                                };
+                            }
+                            quote! {
+                                #id(..) => Some(#a.into())
+                            }
+                        });
+
+                        advices
+                    }
+                }
+            });
+
+            /* let label_arms = arms.map(|arm| arm.1);
+            let advice_arms = arms.map(|arm| arm.2); */
+
+            /* let advice_keys = advices.keys();
             let advice_values = advices.values();
 
             let label_keys = labels.keys();
             let label_values = labels.values();
 
             let cat_keys = categories.keys();
-            let cat_values = categories.values();
+            let cat_values = categories.values(); */
+
+            let ts = Some(quote! {
+                _ => 1
+            });
 
             let gen = quote! {
                 impl Diagnostic for #name {
                     fn category(&self) -> DiagnosticCategory {
                         use #name::*;
                         match self {
-                            #( #cat_keys => DiagnosticCategory::#cat_values,)*
-                            #( #externals(err) => err.category(),)*
+                             #(#cat_arms,)*
                             _ => DiagnosticCategory::Misc
                         }
                     }
@@ -97,8 +239,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     fn label(&self) -> String {
                         use #name::*;
                         match self {
-                            #( #label_keys => #label_values.into(),)*
-                            #( #externals(err) => err.label(),)*
+                            #(#label_arms,)*
                             _ => "crate::label".into()
                         }
                     }
@@ -106,8 +247,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     fn advice(&self) -> Option<String> {
                         use #name::*;
                         match self {
-                            #( #advice_keys => Some(#advice_values.into()),)*
-                            #( #externals(err) => err.advice(),)*
+                            #(#advice_arms,)*
                             _ => None
                         }
                     }
