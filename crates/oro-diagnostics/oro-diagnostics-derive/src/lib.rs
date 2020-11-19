@@ -1,6 +1,5 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use std::collections::HashMap;
 use syn::Data;
 
 #[proc_macro_derive(Diagnostic, attributes(advice, category, label, ask))]
@@ -37,11 +36,6 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
 
     match ast.data {
         Data::Enum(enm) => {
-            /* let mut advices: HashMap<syn::Ident, String> = HashMap::new();
-            let mut labels: HashMap<syn::Ident, String> = HashMap::new();
-            let mut categories: HashMap<syn::Ident, syn::Ident> = HashMap::new();
-
-            let mut externals: Vec<syn::Ident> = Vec::new(); */
 
             let variants = enm.variants;
 
@@ -209,18 +203,6 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     }
                 }
             });
-
-            /* let label_arms = arms.map(|arm| arm.1);
-            let advice_arms = arms.map(|arm| arm.2); */
-
-            /* let advice_keys = advices.keys();
-            let advice_values = advices.values();
-
-            let label_keys = labels.keys();
-            let label_values = labels.values();
-
-            let cat_keys = categories.keys();
-            let cat_values = categories.values(); */
 
             let gen = quote! {
                 impl Diagnostic for #name {
