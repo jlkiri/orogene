@@ -73,6 +73,43 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
 
             gen.into()
         }
+        Data::Struct(_) => {
+            let label_string = ast.attrs.iter().find_map(|a| {
+                if a.path.is_ident("label") {
+                    let string: syn::LitStr = a.parse_args().unwrap();
+                    Some(string.value())
+                } else {
+                    None
+                }
+            });
+
+            let advice_string = ast.attrs.iter().find_map(|a| {
+                if a.path.is_ident("advice") {
+                    let string: syn::LitStr = a.parse_args().unwrap();
+                    Some(string.value())
+                } else {
+                    None
+                }
+            });
+
+            let gen = quote! {
+                impl Diagnostic for #name {
+                    fn category(&self) -> DiagnosticCategory {
+                        DiagnosticCategory::Misc
+                    }
+
+                    fn label(&self) -> String {
+                        #label_string.into()
+                    }
+
+                    fn advice(&self) -> Option<String> {
+                        Some(#advice_string.into())
+                    }
+                }
+            };
+
+            gen.into()
+        }
         _ => todo!(),
     }
 }
