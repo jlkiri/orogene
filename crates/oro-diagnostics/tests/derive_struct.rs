@@ -1,5 +1,6 @@
 use oro_diagnostics::Diagnostic;
 use oro_diagnostics::DiagnosticCategory;
+use oro_diagnostics::Explain;
 use oro_diagnostics_derive::Diagnostic;
 use thiserror::Error;
 
@@ -9,6 +10,8 @@ use thiserror::Error;
 #[advice("Color.")]
 #[category(Misc)]
 pub struct Color;
+
+impl Explain for Color {}
 
 #[test]
 fn it_works() {

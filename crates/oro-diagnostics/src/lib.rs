@@ -5,12 +5,6 @@ use colored::Colorize;
 use thiserror::Error;
 use url::{Host, Url};
 
-pub struct ErrorMeta {
-    net: Option<NetMeta>,
-    path: Option<PathMeta>,
-    parse_report: Option<ParseMeta>,
-}
-
 #[derive(Error)]
 #[error("{:?}", self)]
 pub struct DiagnosticError {
@@ -18,7 +12,7 @@ pub struct DiagnosticError {
     pub category: DiagnosticCategory,
     pub label: String,
     pub advice: Option<String>,
-    pub meta: Option<ErrorMeta>,
+    pub meta: Option<Meta>,
 }
 
 impl fmt::Debug for DiagnosticError {
@@ -29,12 +23,11 @@ impl fmt::Debug for DiagnosticError {
             use DiagnosticCategory::*;
             write!(f, "{}", self.label.red())?;
             if let Net = &self.category {
-                let net_meta = &self.meta.as_ref().unwrap().net;
-                if let Some(meta) = net_meta {
-                    if let Some(ref url) = meta.url {
+                if let Some(Meta::Net { host, url }) = &self.meta {
+                    if let Some(ref url) = url {
                         write!(f, " @ {}", format!("{}", url).cyan().underline())?;
                     } else {
-                        write!(f, " @ {}", format!("{}", meta.host).cyan().underline())?;
+                        write!(f, " @ {}", format!("{}", host).cyan().underline())?;
                     }
                 }
             }
@@ -56,15 +49,9 @@ where
     E: Diagnostic + Send + Sync,
 {
     fn from(error: E) -> Self {
-        let meta = ErrorMeta {
-            net: error.net(),
-            path: error.path(),
-            parse_report: error.parse_report(),
-        };
-
         Self {
             category: error.category(),
-            meta: Some(meta),
+            meta: error.meta(),
             label: error.label(),
             advice: error.advice(),
             error: Box::new(error),
@@ -72,41 +59,29 @@ where
     }
 }
 
-pub struct NetMeta {
-    pub host: Host,
-    pub url: Option<Url>,
+pub enum Meta {
+    Net {
+        host: Host,
+        url: Option<Url>,
+    },
+    Fs {
+        path: PathBuf,
+    },
+    Parse {
+        input: String,
+        row: usize,
+        col: usize,
+        path: Option<PathBuf>,
+    },
 }
 
-pub struct PathMeta {
-    pub path: PathBuf,
-}
-
-pub struct ParseMeta {
-    pub input: String,
-    pub row: usize,
-    pub col: usize,
-    pub path: Option<PathBuf>,
-}
-
-pub trait Net {
-    fn net(&self) -> Option<NetMeta> {
+pub trait Explain {
+    fn meta(&self) -> Option<Meta> {
         None
     }
 }
 
-pub trait FsPath {
-    fn path(&self) -> Option<PathMeta> {
-        None
-    }
-}
-
-pub trait Parseable {
-    fn parse_report(&self) -> Option<ParseMeta> {
-        None
-    }
-}
-
-pub trait Diagnostic: std::error::Error + Send + Sync + Parseable + Net + FsPath + 'static {
+pub trait Diagnostic: std::error::Error + Send + Sync + Explain + 'static {
     fn category(&self) -> DiagnosticCategory;
     fn label(&self) -> String;
     fn advice(&self) -> Option<String>;

@@ -9,28 +9,6 @@ pub fn diagnostics_macro_derive(input: TokenStream) -> TokenStream {
     impl_diagnostics_macro(ast)
 }
 
-/* match attr.parse_meta() {
-    Ok(meta) => match meta {
-        syn::Meta::NameValue(nv) => {
-            if nv.path.is_ident("path") {
-                paths.insert(variant.ident.clone(), nv.lit.clone());
-            }
-
-            if nv.path.is_ident("host") {
-                hosts.insert(variant.ident.clone(), nv.lit.clone());
-            }
-
-            if nv.path.is_ident("url") {
-                urls.insert(variant.ident.clone(), nv.lit.clone());
-            }
-        }
-        _ => (),
-    },
-    Err(_) => {
-
-    }
-} */
-
 fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
     let name = ast.ident;
 
@@ -50,22 +28,12 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     }
                 });
 
-                let has_use_attr: Vec<bool> = variant
+                let has_ask_attr: Vec<bool> = variant
                     .fields
                     .iter()
-                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("use")))
+                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("ask")))
                     .collect();
-                let should_ask = has_use_attr.contains(&true);
-
-                /* let inner_attr_macro = variant.fields.into_iter().map(|f| {
-                    f.attrs.into_iter().map(|attr| match attr.parse_meta() {
-                        Ok(meta) => match meta {
-                            syn::Meta::Path(p) => if is_ident("path") {},
-                            _ => (),
-                        },
-                        Err(_) => {}
-                    })
-                }); */
+                let should_ask = has_ask_attr.contains(&true);
 
                 match variant.fields {
                     syn::Fields::Unit => {
@@ -87,15 +55,13 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         cat_arms
                     }
                     syn::Fields::Unnamed(_) => {
-                        /* match f {
+                        if should_ask {
+                            return Some(quote! {
+                                #id(err) => err.category(),
+                            });
+                        }
 
-                        } */
                         let cat_arms = cat.map(|c| {
-                            if should_ask {
-                                return quote! {
-                                    #id(err) => err.category(),
-                                };
-                            }
                             quote! {
                                 #id(..) => DiagnosticCategory::#c,
                             }
@@ -118,12 +84,12 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     }
                 });
 
-                let has_use_attr: Vec<bool> = variant
+                let has_ask_attr: Vec<bool> = variant
                     .fields
                     .iter()
-                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("use")))
+                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("ask")))
                     .collect();
-                let should_ask = has_use_attr.contains(&true);
+                let should_ask = has_ask_attr.contains(&true);
 
                 match variant.fields {
                     syn::Fields::Unit => {
@@ -145,12 +111,13 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         label_arms
                     }
                     syn::Fields::Unnamed(_) => {
+                        if should_ask {
+                            return Some(quote! {
+                                #id(err) => err.label(),
+                            });
+                        }
+
                         let label_arms = labels.map(|l| {
-                            if should_ask {
-                                return quote! {
-                                    #id(err) => err.label(),
-                                };
-                            }
                             quote! {
                                 #id(..) => #l.into(),
                             }
@@ -173,12 +140,14 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     }
                 });
 
-                let has_use_attr: Vec<bool> = variant
+                let has_ask_attr: Vec<bool> = variant
                     .fields
                     .iter()
-                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("use")))
+                    .map(|field| field.attrs.iter().any(|attr| attr.path.is_ident("ask")))
                     .collect();
-                let should_ask = has_use_attr.contains(&true);
+                let should_ask = has_ask_attr.contains(&true);
+
+                println!("{} : {}", id, should_ask);
 
                 match variant.fields {
                     syn::Fields::Unit => {
@@ -200,12 +169,13 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         advices
                     }
                     syn::Fields::Unnamed(_) => {
+                        if should_ask {
+                            return Some(quote! {
+                                #id(err) => err.advice(),
+                            });
+                        };
+
                         let advices = advices.map(|a| {
-                            if should_ask {
-                                return quote! {
-                                    #id(err) => err.advice(),
-                                };
-                            }
                             quote! {
                                 #id(..) => Some(#a.into()),
                             }
@@ -264,6 +234,8 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     None
                 }
             });
+
+            println!("{} : {:?}", name, advice_string);
 
             let cat_id = ast.attrs.iter().find_map(|a| {
                 if a.path.is_ident("category") {

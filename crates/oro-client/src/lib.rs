@@ -1,4 +1,4 @@
-use oro_diagnostics::{Diagnostic, DiagnosticCategory, FsPath, Net, Parseable};
+use oro_diagnostics::{Diagnostic, DiagnosticCategory, Explain, Meta};
 use serde::Deserialize;
 use surf::Client;
 use thiserror::Error;
@@ -25,20 +25,26 @@ pub enum OroClientError {
     },
 }
 
+impl Explain for OroClientError {
+    fn meta(&self) -> Option<Meta> {
+        match self {
+            RequestError { ref url, .. } => Some(Net {
+                url: Some(url.clone()),
+                host: url.host().expect("this should have a host").to_owned(),
+            }),
+            ResponseError { ref url, .. } => Some(Net {
+                url: Some(url.clone()),
+                host: url.host().expect("this should have a host").to_owned(),
+            }),
+        }
+    }
+}
+
 impl Diagnostic for OroClientError {
     fn category(&self) -> DiagnosticCategory {
         use DiagnosticCategory::*;
         use OroClientError::*;
-        match self {
-            RequestError { ref url, .. } => Net {
-                url: Some(url.clone()),
-                host: url.host().expect("this should have a host").to_owned(),
-            },
-            ResponseError { ref url, .. } => Net {
-                url: Some(url.clone()),
-                host: url.host().expect("this should have a host").to_owned(),
-            },
-        }
+        Net
     }
 
     fn label(&self) -> String {
