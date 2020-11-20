@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use oro_diagnostics::{Diagnostic, DiagnosticCategory};
+use oro_diagnostics::{Diagnostic, DiagnosticCategory, Explain, Meta};
 use oro_node_semver::Version;
 use oro_package_spec::PackageSpec;
 use thiserror::Error;
@@ -40,6 +40,16 @@ pub enum RoggaError {
     MiscError(String),
 }
 
+impl Explain for RoggaError {
+    fn meta(&self) -> Option<Meta> {
+        use RoggaError::*;
+        match self {
+            IoError(_, ref path) => Some(Meta::Fs { path: path.clone() }),
+            _ => None,
+        }
+    }
+}
+
 impl Diagnostic for RoggaError {
     fn category(&self) -> DiagnosticCategory {
         use DiagnosticCategory::*;
@@ -48,7 +58,7 @@ impl Diagnostic for RoggaError {
             MissingVersion(..) => Misc,
             PackageSpecError(err) => err.category(),
             ResolverError(err) => err.category(),
-            IoError(_, ref path) => Fs { path: path.clone() },
+            IoError(..) => Fs,
             OroClientError(err) => err.category(),
             SerdeError(_) => todo!(),
             UrlError(_) => todo!(),
