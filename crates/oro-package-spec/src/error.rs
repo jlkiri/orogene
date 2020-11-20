@@ -1,5 +1,5 @@
 use nom::error::{ContextError, ErrorKind, FromExternalError, ParseError};
-use oro_diagnostics::{Diagnostic, DiagnosticCategory};
+use oro_diagnostics::{Diagnostic, DiagnosticCategory, FsPath, Net, ParseMeta, Parseable};
 use oro_node_semver::SemverError;
 use thiserror::Error;
 use url::ParseError as UrlParseError;
@@ -11,6 +11,9 @@ pub struct PackageSpecError {
     pub offset: usize,
     pub kind: SpecErrorKind,
 }
+
+impl FsPath for PackageSpecError {}
+impl Net for PackageSpecError {}
 
 impl PackageSpecError {
     pub fn location(&self) -> (usize, usize) {
@@ -65,15 +68,21 @@ pub enum SpecErrorKind {
     Other,
 }
 
-impl Diagnostic for PackageSpecError {
-    fn category(&self) -> DiagnosticCategory {
+impl Parseable for PackageSpecError {
+    fn parse_report(&self) -> Option<ParseMeta> {
         let (row, col) = self.location();
-        DiagnosticCategory::Parse {
+        Some(ParseMeta {
             input: self.input.clone(),
             path: None,
             row,
             col,
-        }
+        })
+    }
+}
+
+impl Diagnostic for PackageSpecError {
+    fn category(&self) -> DiagnosticCategory {
+        DiagnosticCategory::Parse
     }
 
     fn label(&self) -> String {

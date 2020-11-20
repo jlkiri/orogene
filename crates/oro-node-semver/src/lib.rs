@@ -12,7 +12,7 @@ use nom::error::{context, ContextError, ErrorKind, FromExternalError, ParseError
 use nom::multi::separated_list1;
 use nom::sequence::{preceded, tuple};
 use nom::{Err, IResult};
-use oro_diagnostics::{Diagnostic, DiagnosticCategory};
+use oro_diagnostics::{Diagnostic, DiagnosticCategory, FsPath, Net, ParseMeta, Parseable};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use serde::ser::{Serialize, Serializer};
 use thiserror::Error;
@@ -32,6 +32,9 @@ pub struct SemverError {
     offset: usize,
     kind: SemverErrorKind,
 }
+
+impl FsPath for SemverError {}
+impl Net for SemverError {}
 
 impl SemverError {
     pub fn location(&self) -> (usize, usize) {
@@ -87,19 +90,21 @@ struct SemverParseError<I> {
     kind: Option<SemverErrorKind>,
 }
 
-impl Diagnostic for SemverError {
-    fn category(&self) -> DiagnosticCategory {
-        DiagnosticCategory::Parse
-    }
-
-    fn parse_meta(&self) -> Option<ParseMeta> {
+impl Parseable for SemverError {
+    fn parse_report(&self) -> Option<ParseMeta> {
         let (row, col) = self.location();
-        ParseMeta {
+        Some(ParseMeta {
             input: self.input.clone(),
             path: None,
             row,
             col,
-        }
+        })
+    }
+}
+
+impl Diagnostic for SemverError {
+    fn category(&self) -> DiagnosticCategory {
+        DiagnosticCategory::Parse
     }
 
     fn label(&self) -> String {

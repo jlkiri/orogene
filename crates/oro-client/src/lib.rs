@@ -1,4 +1,4 @@
-use oro_diagnostics::{Diagnostic, DiagnosticCategory};
+use oro_diagnostics::{Diagnostic, DiagnosticCategory, FsPath, Net, Parseable};
 use serde::Deserialize;
 use surf::Client;
 use thiserror::Error;
@@ -12,7 +12,7 @@ use crate::http_client::PoolingClient;
 
 mod http_client;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Parseable, NetMeta, FsPath)]
 pub enum OroClientError {
     // TODO: add registry URL here?
     #[error("Registry request failed:\n\t{surf_err}")]
