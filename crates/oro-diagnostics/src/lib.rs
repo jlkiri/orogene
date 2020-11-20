@@ -55,7 +55,41 @@ where
     }
 }
 
-pub trait Diagnostic: std::error::Error + Send + Sync + 'static {
+pub struct NetMeta {
+    host: Host,
+    url: Option<Url>,
+}
+
+pub struct PathMeta {
+    path: PathBuf,
+}
+
+pub struct ParseMeta {
+    input: String,
+    row: usize,
+    col: usize,
+    path: Option<PathBuf>,
+}
+
+pub trait Net {
+    fn net(&self) -> Option<NetMeta> {
+        None
+    }
+}
+
+pub trait FsPath {
+    fn path(&self) -> Option<PathMeta> {
+        None
+    }
+}
+
+pub trait Parseable {
+    fn parse_report(&self) -> Option<ParseMeta> {
+        None
+    }
+}
+
+pub trait Diagnostic: std::error::Error + Send + Sync + Parseable + Net + FsPath + 'static {
     fn category(&self) -> DiagnosticCategory;
     fn label(&self) -> String;
     fn advice(&self) -> Option<String>;
@@ -69,16 +103,11 @@ pub enum DiagnosticCategory {
     /// oro::misc
     Misc,
     /// oro::net
-    Net { host: Host, url: Option<Url> },
+    Net,
     /// oro::fs
-    Fs { path: PathBuf },
+    Fs,
     /// oro::parse
-    Parse {
-        input: String,
-        row: usize,
-        col: usize,
-        path: Option<PathBuf>,
-    },
+    Parse,
 }
 
 pub trait AsDiagnostic<T, E> {

@@ -36,7 +36,6 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
 
     match ast.data {
         Data::Enum(enm) => {
-
             let variants = enm.variants;
 
             let cat_arms = variants.iter().map(|variant| {
@@ -58,6 +57,16 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     .collect();
                 let should_ask = has_use_attr.contains(&true);
 
+                /* let inner_attr_macro = variant.fields.into_iter().map(|f| {
+                    f.attrs.into_iter().map(|attr| match attr.parse_meta() {
+                        Ok(meta) => match meta {
+                            syn::Meta::Path(p) => if is_ident("path") {},
+                            _ => (),
+                        },
+                        Err(_) => {}
+                    })
+                }); */
+
                 match variant.fields {
                     syn::Fields::Unit => {
                         let cat_arms = cat.map(|c| {
@@ -78,6 +87,9 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                         cat_arms
                     }
                     syn::Fields::Unnamed(_) => {
+                        /* match f {
+
+                        } */
                         let cat_arms = cat.map(|c| {
                             if should_ask {
                                 return quote! {
@@ -98,7 +110,7 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                 let id = &variant.ident;
 
                 let labels = variant.attrs.iter().find_map(|a| {
-                    if a.path.is_ident("labels") {
+                    if a.path.is_ident("label") {
                         let string: syn::LitStr = a.parse_args().unwrap();
                         Some(string.value())
                     } else {

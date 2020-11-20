@@ -89,8 +89,12 @@ struct SemverParseError<I> {
 
 impl Diagnostic for SemverError {
     fn category(&self) -> DiagnosticCategory {
+        DiagnosticCategory::Parse
+    }
+
+    fn parse_meta(&self) -> Option<ParseMeta> {
         let (row, col) = self.location();
-        DiagnosticCategory::Parse {
+        ParseMeta {
             input: self.input.clone(),
             path: None,
             row,
