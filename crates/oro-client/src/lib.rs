@@ -12,7 +12,7 @@ use crate::http_client::PoolingClient;
 
 mod http_client;
 
-#[derive(Debug, Error, Parseable, NetMeta, FsPath)]
+#[derive(Debug, Error)]
 pub enum OroClientError {
     // TODO: add registry URL here?
     #[error("Registry request failed:\n\t{surf_err}")]
@@ -27,12 +27,13 @@ pub enum OroClientError {
 
 impl Explain for OroClientError {
     fn meta(&self) -> Option<Meta> {
+        use OroClientError::*;
         match self {
-            RequestError { ref url, .. } => Some(Net {
+            RequestError { ref url, .. } => Some(Meta::Net {
                 url: Some(url.clone()),
                 host: url.host().expect("this should have a host").to_owned(),
             }),
-            ResponseError { ref url, .. } => Some(Net {
+            ResponseError { ref url, .. } => Some(Meta::Net {
                 url: Some(url.clone()),
                 host: url.host().expect("this should have a host").to_owned(),
             }),
@@ -42,9 +43,7 @@ impl Explain for OroClientError {
 
 impl Diagnostic for OroClientError {
     fn category(&self) -> DiagnosticCategory {
-        use DiagnosticCategory::*;
-        use OroClientError::*;
-        Net
+        DiagnosticCategory::Net
     }
 
     fn label(&self) -> String {
