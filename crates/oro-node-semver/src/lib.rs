@@ -13,6 +13,7 @@ use nom::multi::separated_list1;
 use nom::sequence::{preceded, tuple};
 use nom::{Err, IResult};
 use oro_diagnostics::{Diagnostic, DiagnosticCategory, Explain, Meta};
+use oro_diagnostics_derive::Diagnostic;
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use serde::ser::{Serialize, Serializer};
 use thiserror::Error;
@@ -25,8 +26,11 @@ pub mod version_req;
 const MAX_SAFE_INTEGER: u64 = 900_719_925_474_099;
 const MAX_LENGTH: usize = 256;
 
-#[derive(Debug, Error, Eq, PartialEq)]
+#[derive(Debug, Error, Eq, PartialEq, Diagnostic)]
 #[error("Error parsing semver string. {kind}")]
+#[label("semver::no_parse")]
+#[category(Parse)]
+#[advice("lol")]
 pub struct SemverError {
     input: String,
     offset: usize,
@@ -96,20 +100,6 @@ impl Explain for SemverError {
             row,
             col,
         })
-    }
-}
-
-impl Diagnostic for SemverError {
-    fn category(&self) -> DiagnosticCategory {
-        DiagnosticCategory::Parse
-    }
-
-    fn label(&self) -> String {
-        "semver::no_parse".into()
-    }
-
-    fn advice(&self) -> Option<String> {
-        None
     }
 }
 

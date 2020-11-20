@@ -147,8 +147,6 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
                     .collect();
                 let should_ask = has_ask_attr.contains(&true);
 
-                println!("{} : {}", id, should_ask);
-
                 match variant.fields {
                     syn::Fields::Unit => {
                         let advices = advices.map(|a| {
@@ -217,47 +215,84 @@ fn impl_diagnostics_macro(ast: syn::DeriveInput) -> TokenStream {
             gen.into()
         }
         Data::Struct(_) => {
-            let label_string = ast.attrs.iter().find_map(|a| {
-                if a.path.is_ident("label") {
-                    let string: syn::LitStr = a.parse_args().unwrap();
-                    Some(string.value())
-                } else {
-                    None
-                }
-            });
+            let label = ast
+                .attrs
+                .iter()
+                .find_map(|a| {
+                    if a.path.is_ident("label") {
+                        let string: syn::LitStr = a.parse_args().unwrap();
+                        Some(string.value())
+                    } else {
+                        None
+                    }
+                })
+                .map_or(
+                    quote! {
+                        "crate::label".into()
+                    },
+                    |label| {
+                        quote! {
+                            #label.into()
+                        }
+                    },
+                );
 
-            let advice_string = ast.attrs.iter().find_map(|a| {
-                if a.path.is_ident("advice") {
-                    let string: syn::LitStr = a.parse_args().unwrap();
-                    Some(string.value())
-                } else {
-                    None
-                }
-            });
+            let advice = ast
+                .attrs
+                .iter()
+                .find_map(|a| {
+                    if a.path.is_ident("advice") {
+                        let string: syn::LitStr = a.parse_args().unwrap();
+                        Some(string.value())
+                    } else {
+                        None
+                    }
+                })
+                .map_or(
+                    quote! {
+                        None
+                    },
+                    |val| {
+                        quote! {
+                            Some(#val.into())
+                        }
+                    },
+                );
 
-            println!("{} : {:?}", name, advice_string);
-
-            let cat_id = ast.attrs.iter().find_map(|a| {
-                if a.path.is_ident("category") {
-                    let string: syn::Ident = a.parse_args().unwrap();
-                    Some(string)
-                } else {
-                    None
-                }
-            });
+            let cat = ast
+                .attrs
+                .iter()
+                .find_map(|a| {
+                    if a.path.is_ident("category") {
+                        let string: syn::Ident = a.parse_args().unwrap();
+                        Some(string)
+                    } else {
+                        None
+                    }
+                })
+                .map_or(
+                    quote! {
+                        DiagnosticCategory::Misc
+                    },
+                    |cat| {
+                        quote! {
+                            DiagnosticCategory::#cat
+                        }
+                    },
+                );
 
             let gen = quote! {
                 impl Diagnostic for #name {
                     fn category(&self) -> DiagnosticCategory {
-                        DiagnosticCategory::#cat_id
+                        #cat
                     }
 
                     fn label(&self) -> String {
-                        #label_string.into()
+                        #label
                     }
 
                     fn advice(&self) -> Option<String> {
-                        Some(#advice_string.into())
+                        #advice
                     }
                 }
             };
