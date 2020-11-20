@@ -30,7 +30,6 @@ const MAX_LENGTH: usize = 256;
 #[error("Error parsing semver string. {kind}")]
 #[label("semver::no_parse")]
 #[category(Parse)]
-#[advice("lol")]
 pub struct SemverError {
     input: String,
     offset: usize,
